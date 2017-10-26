@@ -1,0 +1,28 @@
+*** drivers/hid/usbhid/hid-core.c	2017-10-26 19:33:36.658828648 +0100
+--- drivers/hid/usbhid/hid-core.c.p	2017-10-26 19:35:59.588994247 +0100
+***************
+*** 56,61 ****
+--- 56,65 ----
+  module_param_named(jspoll, hid_jspoll_interval, uint, 0644);
+  MODULE_PARM_DESC(jspoll, "Polling interval of joysticks");
+  
++ static unsigned int hid_otherhid_interval;
++ module_param_named(otherhidpoll, hid_otherhid_interval, uint, 0644);
++ MODULE_PARM_DESC(otherhidpoll, "Polling interval of all non-mice/joystick hid devices");
++ 
+  static unsigned int ignoreled;
+  module_param_named(ignoreled, ignoreled, uint, 0644);
+  MODULE_PARM_DESC(ignoreled, "Autosuspend with active leds");
+***************
+*** 1105,1110 ****
+--- 1109,1118 ----
+  			if (hid_jspoll_interval > 0)
+  				interval = hid_jspoll_interval;
+  			break;
++ 		default:
++ 			if (hid_otherhid_interval > 0)
++ 				interval = hid_otherhid_interval;
++ 			break;
+  		}
+  
+  		ret = -ENOMEM;

@@ -8,4 +8,8 @@ In this case the stable release
 wget https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.13.9.tar.xz
 
 # Patch the source #
+cd linux-X.X.X
+patch -p1 < ../linux-usbhid-otherhidpoll.patch
+# For some reason this patch doesn't auto-apply correctly
+
 
