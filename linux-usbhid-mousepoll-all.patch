@@ -1,0 +1,17 @@
+--- a/linux-4.11-original/drivers/hid/usbhid/hid-core.c
++++ b/linux-4.11/drivers/hid/usbhid/hid-core.c
+@@ -1081,9 +1081,14 @@ static int usbhid_start(struct hid_device *hid)
+                               hid->name, endpoint->bInterval, interval);
+                }
+
+-               /* Change the polling interval of mice. */
+-               if (hid->collection->usage == HID_GD_MOUSE && hid_mousepoll_interval > 0)
++               /* Change the polling interval of mice.
++               EDIT 2016-09-03: poll everything with mousepoll
++                */
++               if (/*hid->collection->usage == HID_GD_MOUSE &&*/ hid_mousepoll_interval > 0) {
++                       printk(KERN_INFO "%s: Changed interval to mousepoll: %d -> %d\n",
++                              hid->name, interval, hid_mousepoll_interval);
+                        interval = hid_mousepoll_interval;
++               }
+
