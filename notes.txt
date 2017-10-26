@@ -12,4 +12,32 @@ cd linux-X.X.X
 patch -p1 < ../linux-usbhid-otherhidpoll.patch
 # For some reason this patch doesn't auto-apply correctly
 
+# Copy the needed kernel config as a template
+cp linux-mint-config linux-X.X.X/.config
+
+# Edit the config
+make menuconfig
+- General settings
+-- Local version: geefr-usbhid
+-- Automatically append version information to the version string
+-- Compiler optimization level: Optimize for performance
+-Processor type and features
+--Preemption Model: Low-Latency Desktop
+--Built-in Kernel command line: otherhidpoll=1
+--Build-in command line override boot loader arguments: false
+-Leave everything else as default
+
+
+# Disable debug info to save disk space
+scripts/config --disable DEBUG_INFO
+
+# Don't forget to check the config in
+
+# Build the package
+# This doesn't work in debian stretch, the package was dropped because of some serious bug
+# fakeroot make-kpkg --initrd kernel-image kernel-headers kernel-modules
+# See https://kernel-handbook.alioth.debian.org/ch-common-tasks.html#s-common-official
+make clean
+make deb-pkg -j6
+
 
