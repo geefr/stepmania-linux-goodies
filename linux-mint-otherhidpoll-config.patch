@@ -1,5 +1,6 @@
-*** drivers/hid/usbhid/hid-core.c	2017-10-26 19:33:36.658828648 +0100
---- drivers/hid/usbhid/hid-core.c.p	2017-10-26 19:35:59.588994247 +0100
+diff -cr linux-4.13.9/drivers/hid/usbhid/hid-core.c linux-4.13.9-patched/drivers/hid/usbhid/hid-core.c
+*** linux-4.13.9/drivers/hid/usbhid/hid-core.c	2017-10-21 16:55:07.000000000 +0100
+--- linux-4.13.9-patched/drivers/hid/usbhid/hid-core.c	2017-10-26 22:15:57.063151305 +0100
 ***************
 *** 56,61 ****
 --- 56,65 ----
