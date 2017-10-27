@@ -1,6 +1,8 @@
+Only in linux-4.13.9-patched: .config
+Only in linux-4.13.9-patched: .config.old
 diff -cr linux-4.13.9/drivers/hid/usbhid/hid-core.c linux-4.13.9-patched/drivers/hid/usbhid/hid-core.c
 *** linux-4.13.9/drivers/hid/usbhid/hid-core.c	2017-10-21 16:55:07.000000000 +0100
---- linux-4.13.9-patched/drivers/hid/usbhid/hid-core.c	2017-10-26 22:15:57.063151305 +0100
+--- linux-4.13.9-patched/drivers/hid/usbhid/hid-core.c	2017-10-27 19:52:30.976840677 +0100
 ***************
 *** 56,61 ****
 --- 56,65 ----
@@ -16,14 +18,39 @@ diff -cr linux-4.13.9/drivers/hid/usbhid/hid-core.c linux-4.13.9-patched/drivers
   MODULE_PARM_DESC(ignoreled, "Autosuspend with active leds");
 ***************
 *** 1105,1110 ****
---- 1109,1118 ----
+--- 1109,1120 ----
   			if (hid_jspoll_interval > 0)
   				interval = hid_jspoll_interval;
   			break;
 + 		default:
 + 			if (hid_otherhid_interval > 0)
++ 				printk(KERN_INFO "%s: Changed interval to hid_otherhid_interval: %d -> %d\n",
++ 						hid->name, interval, hid_otherhid_interval);
 + 				interval = hid_otherhid_interval;
 + 			break;
   		}
   
   		ret = -ENOMEM;
+Only in linux-4.13.9-patched/scripts/basic: fixdep
+Only in linux-4.13.9-patched/scripts/basic: .fixdep.cmd
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: checklist.o
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: .checklist.o.cmd
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: inputbox.o
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: .inputbox.o.cmd
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: menubox.o
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: .menubox.o.cmd
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: textbox.o
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: .textbox.o.cmd
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: util.o
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: .util.o.cmd
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: yesno.o
+Only in linux-4.13.9-patched/scripts/kconfig/lxdialog: .yesno.o.cmd
+Only in linux-4.13.9-patched/scripts/kconfig: mconf
+Only in linux-4.13.9-patched/scripts/kconfig: .mconf.cmd
+Only in linux-4.13.9-patched/scripts/kconfig: mconf.o
+Only in linux-4.13.9-patched/scripts/kconfig: .mconf.o.cmd
+Only in linux-4.13.9-patched/scripts/kconfig: zconf.hash.c
+Only in linux-4.13.9-patched/scripts/kconfig: zconf.lex.c
+Only in linux-4.13.9-patched/scripts/kconfig: zconf.tab.c
+Only in linux-4.13.9-patched/scripts/kconfig: zconf.tab.o
+Only in linux-4.13.9-patched/scripts/kconfig: .zconf.tab.o.cmd
