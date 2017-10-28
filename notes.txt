@@ -10,7 +10,6 @@ wget https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.13.9.tar.xz
 # Patch the source #
 cd linux-X.X.X
 patch -p1 < ../linux-usbhid-otherhidpoll.patch
-# For some reason this patch doesn't auto-apply correctly
 
 # Copy the needed kernel config as a template
 cp linux-mint-config linux-X.X.X/.config
@@ -40,4 +39,9 @@ scripts/config --disable DEBUG_INFO
 make clean
 make deb-pkg -j6
 
+# Broken boot status
+usbhid patch booted (And still does)
+1000hz didn't boot, regardless of whether distcc was used
+Removing the klog in usbhid didn't help
+Disabling dynamic ticks fixed it but for some reason there's still usbhid polling problems in sm5
 

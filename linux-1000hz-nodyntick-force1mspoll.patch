@@ -1,0 +1,33 @@
+diff -cr linux-4.13.9/drivers/hid/usbhid/hid-core.c linux-4.13.9-patched/drivers/hid/usbhid/hid-core.c
+*** linux-4.13.9/drivers/hid/usbhid/hid-core.c	2017-10-21 16:55:07.000000000 +0100
+--- linux-4.13.9-patched/drivers/hid/usbhid/hid-core.c	2017-10-28 15:37:40.803979792 +0100
+***************
+*** 1095,1111 ****
+  				hid->name, endpoint->bInterval, interval);
+  		}
+  
+! 		/* Change the polling interval of mice and joysticks. */
+! 		switch (hid->collection->usage) {
+! 		case HID_GD_MOUSE:
+! 			if (hid_mousepoll_interval > 0)
+! 				interval = hid_mousepoll_interval;
+! 			break;
+! 		case HID_GD_JOYSTICK:
+! 			if (hid_jspoll_interval > 0)
+! 				interval = hid_jspoll_interval;
+! 			break;
+! 		}
+  
+  		ret = -ENOMEM;
+  		if (usb_endpoint_dir_in(endpoint)) {
+--- 1095,1104 ----
+  				hid->name, endpoint->bInterval, interval);
+  		}
+  
+! 		/* Change the polling rate of everything! */
+! 		interval = 1;
+! 		printk(KERN_INFO "%s: Changed interval to 1ms: %d -> %d\n",
+! 				hid->name, interval, 1);
+  
+  		ret = -ENOMEM;
+  		if (usb_endpoint_dir_in(endpoint)) {
