@@ -61,7 +61,7 @@ const uint8_t analogMax = 255;
 
 // When there's no data from stepmania run some idle animations and such
 // Wait this long before falling into the idle mode
-const uint32_t idleTimeoutMS = 2500;
+const uint32_t idleTimeoutMS = 1000;
 uint32_t lastDataFromStepmania = 0;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
