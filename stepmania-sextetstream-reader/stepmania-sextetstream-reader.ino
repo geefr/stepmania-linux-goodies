@@ -30,88 +30,25 @@
 // Arduino reader for Stepmania's Sextet Stream light driver
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "pad.h"
+
+Pad lePad;
+
 // Buffer for data from stepmania
 // https://github.com/stepmania/stepmania/blob/master/src/arch/Lights/LightsDriver_SextetStream.md
 // 13 bytes + '\n'
 const uint32_t dataSize = 14;
 char data[dataSize];
 
-// Pad enum -> output pin ID
-// Reassign these to what you need, these 2 are a fairly sensible layout
-// Digital io
-/*
-enum Pad {
-  pad1Left = 2,
-  pad1Right = 3,
-  pad1Up = 4,
-  pad1Down = 5,
-};*/
-
-// Analog (PWM) io
-enum Pad {
-  pad1Left = 3,
-  pad1Right = 9,
-  pad1Up = 10,
-  pad1Down = 11,
-};
-
-// Min/max PWM values for fading the leds
-const uint8_t analogMin = 0;
-const uint8_t analogMax = 255;
-
 // When there's no data from stepmania run some idle animations and such
 // Wait this long before falling into the idle mode
-const uint32_t idleTimeoutMS = 1000;
+const uint32_t idleTimeoutMS = 2500;
 uint32_t lastDataFromStepmania = 0;
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-void setPad( uint8_t pad, bool on ) {
-  digitalWrite( pad, on );
-}
-
-void setAllPads( bool on ) {
-  setPad( pad1Left, on );
-  setPad( pad1Right, on );
-  setPad( pad1Up, on );
-  setPad( pad1Down, on );
-}
-
-void setPadAnalog(uint8_t pad, uint8_t v ) {
-  analogWrite(pad, v);
-}
-
-void setAllPadsAnalog( uint8_t v ) {
-  setPadAnalog( pad1Left, v );
-  setPadAnalog( pad1Right, v );
-  setPadAnalog( pad1Up, v );
-  setPadAnalog( pad1Down, v );
-}
-
-// Input
-// Byte 3
-// 0x01 Player 1 #1 left
-// 0x02 Player 1 #2 right
-// 0x04 Player 1 #3 up
-// 0x08 Player 1 #4 down
-bool getSextet( char data[dataSize], uint8_t pad ) {
-  switch( pad ) {
-    case pad1Left:
-      return (data[3] & 0x01) >> 0x00;
-    case pad1Right:
-      return (data[3] & 0x02) >> 0x01;
-    case pad1Up:
-      return (data[3] & 0x04) >> 0x02;
-    case pad1Down:
-      return (data[3] & 0x08) >> 0x03;
-  }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
+uint32_t lastUpdate = 0;
 
 // Definition of a light fade
 struct LightFade {
-  Pad pad;
+  LightPin pad;
   uint8_t startVal;
   uint8_t endVal;
   uint8_t curVal;
@@ -123,7 +60,7 @@ struct LightFade {
   : pad(pad1Up), startVal(0), endVal(255), curVal(0), startTimeMS(0), nextTimeMS(0), rate(0)
   {}
   
-  LightFade( Pad p, uint32_t start, uint32_t r, uint8_t a, uint8_t b )
+  LightFade( LightPin p, uint32_t start, uint32_t r, uint8_t a, uint8_t b )
   : pad(p), startVal(a), endVal(b), curVal(startVal), startTimeMS(start), nextTimeMS(start), rate(r)
   {}
 
@@ -133,7 +70,7 @@ struct LightFade {
     if( now > nextTimeMS ) {
       if( startVal < endVal ) ++curVal;
       else --curVal;
-      setPadAnalog( pad, curVal );
+      lePad.set( pad, curVal );
       nextTimeMS += rate;
     }
   }
@@ -153,18 +90,6 @@ LightFadeSequence fadeSequences[numFadeSequences];
 uint32_t currentFadeSequence = 0;
 uint32_t numFadeSequenceRepeats = 4;
 uint32_t currentFadeSequenceRepeat = 0;
-
-// A bunch of light patterns - They end where they started
-void pattern_quadFade( uint32_t rate ) {
-  for( auto i = analogMin; i < analogMax; ++i ) {
-    setAllPadsAnalog( i );
-    delay( rate );
-  }
-  for( auto i = analogMax; i > analogMin; --i ) {
-    setAllPadsAnalog( i );
-    delay( rate );
-  }
-}
 
 void pattern_runFadeSequence( struct LightFadeSequence& f ) {
   if( f.numFades == 0 ) return;
@@ -199,11 +124,11 @@ void setup() {
   Serial.begin(115200);
 
   // Set a timeout on serial reads - Let us skip if there's no input for a while
-  Serial.setTimeout(100);
+  // This should be low to ensure the pad fading works correctly
+  Serial.setTimeout(10);
 
   // Seed the random number generator
   randomSeed(analogRead(0));
-
 
   // Initialise a bunch of fade sequences
   // Don't add more than numFadeSequences here
@@ -265,9 +190,12 @@ void setup() {
 // The loop function runs over and over again forever
 void loop() {
   auto now = millis();
+
+  // Update the pad (fade the lights out)
+  lePad.tick(now - lastUpdate);
+  lastUpdate = now;
   
   auto bytesRead = Serial.readBytes(data, dataSize);
- 
   if( bytesRead != 0 )
   {
     // Got data from stepmania, do as instructed
@@ -276,10 +204,7 @@ void loop() {
     lastDataFromStepmania = millis();
    
     // Set the pad lights based on the data
-    setPad( pad1Left, getSextet( data, pad1Left ) );
-    setPad( pad1Right, getSextet( data, pad1Right ) );
-    setPad( pad1Up, getSextet( data, pad1Up ) );
-    setPad( pad1Down, getSextet( data, pad1Down ) );
+    lePad.setFromSextet( data );
     return;
   }
 
