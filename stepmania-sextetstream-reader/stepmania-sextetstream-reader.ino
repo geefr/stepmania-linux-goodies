@@ -105,6 +105,7 @@ void pattern_runFadeSequence( struct LightFadeSequence& f ) {
     for( auto i = 0u; i < f.numFades; ++i ) {
       auto& fade = fades[i];
       fade.tick(now);
+      if( Serial.peek() != -1 ) { delete [] fades; return; }
     }
     if( fades[f.numFades - 1].done() ) break;
   }
