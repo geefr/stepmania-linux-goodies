@@ -22,60 +22,107 @@
 
 // Enum and state definitions
 #include "common.h"
+// Serial interfaces/protocols
+// - Debug info/helpers
+// - Compatibility with cabinet-side software
+#include "serialproto.h"
+#include "serialprotodebug.h"
+// #include "serial/mckyla.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Sketch configuration - Uncomment these to enable software features
 // #define ENABLE_EEPROM // Save sensitivity data to board's EEPROM, persist settings without connecting to cabinet
 
-// The serial interface mode to use - Compatibility with cabinet-side calibration/monitoring software
-#include "serialproto.h"
-#include "serialprotodebug.h"
-// #include "serial/mckyla.h"
-// #include "serial/dummy.h"
+// Global state setup - configure pin -> pad mappings and sketch features here
+void initialiseState(State& s)
+{
+  // The serial protocol to talk
+  s.serial.reset(new SerialProtoDebug(115200));
+  s.serial->initialise();
+  
+  // Configure the mapping between IO pin and panel
+  // s.sensors[analog pin index] = Panel::XXX
+  s.sensors[0].panel = Panel::P1Left;
+  s.sensors[1].panel = Panel::P1Right;
+  s.sensors[2].panel = Panel::P1Up;
+  s.sensors[3].panel = Panel::P1Up;
+  // s.sensors[4].panel = Panel::P1Right; // broken :-[
+  s.sensors[5].panel = Panel::P1Down;
+  s.sensors[6].panel = Panel::P1Left;
+  s.sensors[7].panel = Panel::P1Down;
 
-// FSR algorithm - Handles FSR state, applies smoothing, applies threshold detection logic
-// TODO - Some classes here - Dumb direct threshold, first order filter, that with schmitt trigger and such
+  // Other state initialisation - Don't change this
+  for( auto& p : s.sensors ) s.panels[p.second.panel] = false;
+}
 
-// Panel algorithm - Combines per-FSR state into per-panel state
-// TODO - Simple OR at first, seems sensible
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //#ifdef ENABLE_EEPROM
 //# include <EEPROM.h>
 //#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Global state setup - configure pin -> pad mappings and sketch features here
-void initialiseState(State& s)
+// FSR algorithm - Handles FSR state, applies smoothing, applies threshold detection logic
+// TODO - Some classes here - Dumb direct threshold, first order filter, that with schmitt trigger and such
+void fsrAlgorithm(State& s)
 {
-  s.serial.reset(new SerialProtoDebug(115200));
-  s.serial->initialise();
-  
-  // Configure the mapping between IO pin and panel
-  // TODO: These mappings are wrong :D
-  s.sensors[0].panel = Panel::P1Up;
-  s.sensors[1].panel = Panel::P1Up;
-  s.sensors[2].panel = Panel::P1Right;
-  s.sensors[3].panel = Panel::P1Right;
-  s.sensors[4].panel = Panel::P1Down;
-  s.sensors[5].panel = Panel::P1Down;
-  s.sensors[6].panel = Panel::P1Left;
-  s.sensors[7].panel = Panel::P1Left;
-}
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Main sketch functions - Binds basic sequence to the various program elements
-void configureFSRInputPins(State& s)
-{
-  for( auto & p : s.sensors )
+  for( auto& p : s.sensors )
   {
-    pinMode(p.first, INPUT);
+    auto& i = p.second;
+    // Placeholder - no filtering
+    i.filteredValue = i.rawValue;
+    // Placeholder - Direct trigger on sensor min + threshold
+    i.triggered = (i.filteredValue - i.rawValueMin) > i.triggerValue;
   }
 }
 
+// Panel algorithm - Combines per-FSR state into per-panel state
+// TODO - Simple OR at first, seems sensible, is anything more complicated needed?
+void panelAlgorithm(State& s)
+{
+  // Collate sensor info to panel info
+  std::map<Panel, bool> panels;
+  for( auto& p : s.sensors ) panels[p.second.panel] = false;
+
+  for( auto& p : s.sensors )
+  {
+    if( p.second.triggered )
+    {
+      panels[p.second.panel] = true;
+    }
+  }
+
+  // Send all joystick updates in one batch
+  Joystick.useManualSend(true);
+
+  // Detect change in panel state
+  for( auto& p : s.panels )
+  {
+    if( !p.second && panels[p.first] )
+    {
+      // Pressed
+      Joystick.button(static_cast<int>(p.first), 1);
+      p.second = true;
+    }
+    else if( p.second && panels[p.first] )
+    {
+      // Released
+      Joystick.button(static_cast<int>(p.first), 0);
+      p.second = false;
+    }
+  }
+
+  Joystick.send_now();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Main sketch functions - Binds basic sequence to the various program elements
 void readInputPins(State& s)
 {
   for( auto& p : s.sensors )
   {
     p.second.rawValue = analogRead(p.first);
+    p.second.rawValueMin = std::min(p.second.rawValue, p.second.rawValueMin);
   }
 }
 
@@ -85,7 +132,6 @@ float secondsSinceStartup = 0.f;
 
 void setup(void) {
   initialiseState(gState);
-  configureFSRInputPins(gState);
   // TODO
   // - eeprom initialisation
   // - eeprom save support
@@ -100,11 +146,13 @@ void loop(void) {
 
   // Read data from sensors
   readInputPins(gState);
-  
-  // TODO
-  // - Serial update (Before fsr filtering?)
-  // - filter fsr, convert to on/off
-  // - Register joystick presses
 
+  // Apply filters to fsr signals, determine if each sensor is triggered
+  fsrAlgorithm(gState);
+
+  // Combine the sensors, work out if panels are on/off, send joystick updates
+  panelAlgorithm(gState);
+  
+  // Serial update - Handle any commands from the cabinet
   gState.serial->update(t, dT, gState);
 }
