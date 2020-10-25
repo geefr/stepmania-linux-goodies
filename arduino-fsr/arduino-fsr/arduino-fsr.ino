@@ -36,9 +36,8 @@
 // Global state setup - configure pin -> pad mappings and sketch features here
 void initialiseState(State& s)
 {
-  // The serial protocol to talk
-  s.serial.reset(new SerialProtoDebug(115200));
-  s.serial->initialise();
+  // The serial protocol for talking to the cab, or debug. Optional.
+  // s.serial.reset(new SerialProtoDebug(115200));
   
   // Configure the mapping between IO pin and panel
   // s.sensors[analog pin index] = Panel::XXX
@@ -52,6 +51,7 @@ void initialiseState(State& s)
   s.sensors[7].panel = Panel::P1Down;
 
   // Other state initialisation - Don't change this
+  if( s.serial ) s.serial->initialise();
   for( auto& p : s.sensors ) s.panels[p.second.panel] = false;
 }
 
@@ -101,18 +101,20 @@ void panelAlgorithm(State& s)
     if( !p.second && panels[p.first] )
     {
       // Pressed
-      Joystick.button(static_cast<int>(p.first), 1);
+      Joystick.button(static_cast<int>(p.first), true);
       p.second = true;
     }
-    else if( p.second && panels[p.first] )
+    else if( p.second && !panels[p.first] )
     {
       // Released
-      Joystick.button(static_cast<int>(p.first), 0);
+      Joystick.button(static_cast<int>(p.first), false);
       p.second = false;
     }
   }
 
   Joystick.send_now();
+  // Reset to default in case other chunks of code use Joystick
+  Joystick.useManualSend(false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,7 +145,7 @@ void loop(void) {
   auto t = static_cast<float>(millis()) / 1000.f;
   auto dT = t - secondsSinceStartup;
   secondsSinceStartup = t;
-
+  
   // Read data from sensors
   readInputPins(gState);
 
