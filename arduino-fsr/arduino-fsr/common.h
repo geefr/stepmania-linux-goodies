@@ -28,7 +28,8 @@ struct SensorState
   int rawValueMin = std::numeric_limits<int>::max(); // Lowest value the sensor has seen, may be treated as zero by trigger algorithms
   int filteredValue = 0; // Sensor value after filtering, by FSRAlgorithm
   bool triggered = false;// Sensor is on/off, set by FSRAlgorithm
-  int triggerValue = 100; // Sensor trigger value
+  int triggerValue = 140; // Sensor trigger value
+  int triggerSchmittValue = 10; // Buffer around triggerValue for schmitt triggering (TODO: Encapsulation)
 };
 
 class SerialProto;

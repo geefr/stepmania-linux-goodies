@@ -18,11 +18,11 @@ void SerialProtoDebug::initialise() {
 
 void SerialProtoDebug::update(float t, float dT, State& state) {
 // Raw values
-//  for( auto& p : state.sensors )
-//  {
-//    Serial.print(p.second.rawValue /*/ 1023.f * 3.3f*/);
-//    Serial.print(' ');
-//  }
+  for( auto& p : state.sensors )
+  {
+    Serial.print(p.second.filteredValue /*/ 1023.f * 3.3f*/);
+    Serial.print(' ');
+  }
 
 // Sensor triggers
   for( auto& p : state.sensors )

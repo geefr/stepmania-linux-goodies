@@ -27,6 +27,7 @@
 // - Compatibility with cabinet-side software
 #include "serialproto.h"
 #include "serialprotodebug.h"
+#include "serialprotonone.h"
 // #include "serial/mckyla.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,19 +37,32 @@
 // Global state setup - configure pin -> pad mappings and sketch features here
 void initialiseState(State& s)
 {
-  // The serial protocol for talking to the cab, or debug. Optional.
-  // s.serial.reset(new SerialProtoDebug(115200));
+  // The serial protocol for talking to the cab, debug, or none.
+  // Debug is useful for setup but may cause polling issues
+  // A serial protocol must exist - If you don't need anything choose none here
+  //s.serial.reset(new SerialProtoDebug(115200));
+  s.serial.reset(new SerialProtoNone(115200));
   
   // Configure the mapping between IO pin and panel
+  // This is ITGaz's setup, yours will be different
+  // Using SerialInterfaceDebug and the arduino serial monitor can help here,
+  // or maybe there'll be a handy dandy UI to help set this up if you bug me about it <3
   // s.sensors[analog pin index] = Panel::XXX
-  s.sensors[0].panel = Panel::P1Left;
-  s.sensors[1].panel = Panel::P1Right;
   s.sensors[2].panel = Panel::P1Up;
-  s.sensors[3].panel = Panel::P1Up;
-  // s.sensors[4].panel = Panel::P1Right; // broken :-[
-  s.sensors[5].panel = Panel::P1Down;
-  s.sensors[6].panel = Panel::P1Left;
+  s.sensors[6].panel = Panel::P1Up;
+  s.sensors[2].triggerValue = 110;
+  s.sensors[6].triggerValue = 110;
+
+  s.sensors[1].panel = Panel::P1Right;
+  s.sensors[3].panel = Panel::P1Right;
+  
+  s.sensors[0].panel = Panel::P1Down;
   s.sensors[7].panel = Panel::P1Down;
+  
+  s.sensors[4].panel = Panel::P1Left;
+  s.sensors[5].panel = Panel::P1Left;
+  
+  
 
   // Other state initialisation - Don't change this
   if( s.serial ) s.serial->initialise();
@@ -69,10 +83,23 @@ void fsrAlgorithm(State& s)
   for( auto& p : s.sensors )
   {
     auto& i = p.second;
-    // Placeholder - no filtering
-    i.filteredValue = i.rawValue;
-    // Placeholder - Direct trigger on sensor min + threshold
-    i.triggered = (i.filteredValue - i.rawValueMin) > i.triggerValue;
+    // Placeholder - no filtering, just offset to account for panel weight, hoping we're still in a relatively linear range
+    i.filteredValue = i.rawValue - i.rawValueMin;
+    
+    // Placeholder - Direct trigger on sensor min + threshold + schmitt
+    // TODO: This is reliable enough, but sensor acceleration would auto-adjust
+    // TODO: Encapsulate out of main loop, objectify all the things! :O
+    // i.triggered = (i.filteredValue - i.rawValueMin) > (i.triggerValue);
+    
+    if( !i.triggered && i.filteredValue > (i.triggerValue + i.triggerSchmittValue))
+    {
+      i.triggered = true;
+    }
+    else if( i.triggered && i.filteredValue < (i.triggerValue - i.triggerSchmittValue) )
+    {
+      i.triggered = false;
+    }
+    
   }
 }
 
@@ -121,11 +148,16 @@ void panelAlgorithm(State& s)
 // Main sketch functions - Binds basic sequence to the various program elements
 void readInputPins(State& s)
 {
+  static bool firstTime = true;
+  
   for( auto& p : s.sensors )
   {
     p.second.rawValue = analogRead(p.first);
-    p.second.rawValueMin = std::min(p.second.rawValue, p.second.rawValueMin);
+    
+    if( firstTime )
+      p.second.rawValueMin = std::min(p.second.rawValue, p.second.rawValueMin);
   }
+  if( firstTime ) firstTime = false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,6 +173,14 @@ void setup(void) {
 }
 
 void loop(void) {
+  static bool setup = false;
+  if( !setup )
+  {
+//initialiseState(gState);
+setup = true;
+    
+  }
+  
   // Update timing data
   auto t = static_cast<float>(millis()) / 1000.f;
   auto dT = t - secondsSinceStartup;
@@ -156,5 +196,10 @@ void loop(void) {
   panelAlgorithm(gState);
   
   // Serial update - Handle any commands from the cabinet
+  static int i = 0;
+  ++i;
+  if( i % 10 == 0 ) {
   gState.serial->update(t, dT, gState);
+  i = 0;
+  }
 }
