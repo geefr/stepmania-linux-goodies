@@ -28,6 +28,7 @@
 #include "serialproto.h"
 #include "serialprotodebug.h"
 #include "serialprotonone.h"
+#include "serialprotogf.h"
 // #include "serial/mckyla.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,8 +42,9 @@ void initialiseState(State& s)
   // Debug is useful for setup but may cause polling issues
   // A serial protocol must exist - If you don't need anything choose none here
   //s.serial.reset(new SerialProtoDebug(115200));
-  s.serial.reset(new SerialProtoNone(115200));
-  
+  //s.serial.reset(new SerialProtoNone(115200));
+  s.serial.reset(new SerialProtoGF(115200));
+
   // Configure the mapping between IO pin and panel
   // This is ITGaz's setup, yours will be different
   // Using SerialInterfaceDebug and the arduino serial monitor can help here,
@@ -50,19 +52,17 @@ void initialiseState(State& s)
   // s.sensors[analog pin index] = Panel::XXX
   s.sensors[2].panel = Panel::P1Up;
   s.sensors[6].panel = Panel::P1Up;
-  s.sensors[2].triggerValue = 110;
-  s.sensors[6].triggerValue = 110;
+  s.sensors[2].triggerValue = 80;
+  s.sensors[6].triggerValue = 80;
 
   s.sensors[1].panel = Panel::P1Right;
   s.sensors[3].panel = Panel::P1Right;
-  
+
   s.sensors[0].panel = Panel::P1Down;
   s.sensors[7].panel = Panel::P1Down;
-  
+
   s.sensors[4].panel = Panel::P1Left;
   s.sensors[5].panel = Panel::P1Left;
-  
-  
 
   // Other state initialisation - Don't change this
   if( s.serial ) s.serial->initialise();
@@ -85,12 +85,12 @@ void fsrAlgorithm(State& s)
     auto& i = p.second;
     // Placeholder - no filtering, just offset to account for panel weight, hoping we're still in a relatively linear range
     i.filteredValue = i.rawValue - i.rawValueMin;
-    
+
     // Placeholder - Direct trigger on sensor min + threshold + schmitt
     // TODO: This is reliable enough, but sensor acceleration would auto-adjust
     // TODO: Encapsulate out of main loop, objectify all the things! :O
     // i.triggered = (i.filteredValue - i.rawValueMin) > (i.triggerValue);
-    
+
     if( !i.triggered && i.filteredValue > (i.triggerValue + i.triggerSchmittValue))
     {
       i.triggered = true;
@@ -99,7 +99,7 @@ void fsrAlgorithm(State& s)
     {
       i.triggered = false;
     }
-    
+
   }
 }
 
@@ -149,11 +149,11 @@ void panelAlgorithm(State& s)
 void readInputPins(State& s)
 {
   static bool firstTime = true;
-  
+
   for( auto& p : s.sensors )
   {
     p.second.rawValue = analogRead(p.first);
-    
+
     if( firstTime )
       p.second.rawValueMin = std::min(p.second.rawValue, p.second.rawValueMin);
   }
@@ -176,16 +176,15 @@ void loop(void) {
   static bool setup = false;
   if( !setup )
   {
-//initialiseState(gState);
-setup = true;
-    
+    //initialiseState(gState);
+    setup = true;
   }
-  
+
   // Update timing data
   auto t = static_cast<float>(millis()) / 1000.f;
   auto dT = t - secondsSinceStartup;
   secondsSinceStartup = t;
-  
+
   // Read data from sensors
   readInputPins(gState);
 
@@ -194,12 +193,12 @@ setup = true;
 
   // Combine the sensors, work out if panels are on/off, send joystick updates
   panelAlgorithm(gState);
-  
+
   // Serial update - Handle any commands from the cabinet
   static int i = 0;
   ++i;
   if( i % 10 == 0 ) {
-  gState.serial->update(t, dT, gState);
-  i = 0;
+    gState.serial->update(t, dT, gState);
+    i = 0;
   }
 }
