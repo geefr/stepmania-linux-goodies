@@ -33,11 +33,21 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Sketch configuration - Uncomment these to enable software features
-// #define ENABLE_EEPROM // Save sensitivity data to board's EEPROM, persist settings without connecting to cabinet
+// #define ENABLE_DEBUG // Various debug capability, may not work on your board
+// (TODO) #define ENABLE_EEPROM // Save sensitivity data to board's EEPROM, persist settings without connecting to cabinet
+// TODO: Configure light-fading for teensy (<1ms update rate), maybe add in the idle animation system
+#define ENABLE_LIGHTS // Enable light output
+
 
 // Global state setup - configure pin -> pad mappings and sketch features here
 void initialiseState(State& s)
 {
+  //////// SETUP STEPS ////////
+  // Firstly, Click Tools -> Board -> Teensyduino -> Teensy 4.0
+  // (Or your equivalent, this sketch shouldn't care much)
+  // Then Click Tools -> USB Type -> "Serial + Keyboard + Mouse + Joystick"
+  // (Joystick being the important bit - Serial is a nice to have if your board can do it as well)
+  
   // The serial protocol for talking to the cab, debug, or none.
   // Debug is useful for setup but may cause polling issues
   // A serial protocol must exist - If you don't need anything choose none here
@@ -50,20 +60,42 @@ void initialiseState(State& s)
   // Using SerialInterfaceDebug and the arduino serial monitor can help here,
   // or maybe there'll be a handy dandy UI to help set this up if you bug me about it <3
   // s.sensors[analog pin index] = Panel::XXX
-  s.sensors[2].panel = Panel::P1Up;
-  s.sensors[6].panel = Panel::P1Up;
-  s.sensors[2].triggerValue = 80;
-  s.sensors[6].triggerValue = 80;
+  // On Teensy 4 analog index 0-7 correspond to pins 14-21
 
-  s.sensors[1].panel = Panel::P1Right;
-  s.sensors[3].panel = Panel::P1Right;
+  s.sensors[0].panel = Panel::P1Left;
+  s.sensors[1].panel = Panel::P1Left;
 
-  s.sensors[0].panel = Panel::P1Down;
-  s.sensors[7].panel = Panel::P1Down;
+  s.sensors[2].panel = Panel::P1Down;
+  s.sensors[3].panel = Panel::P1Down;
+  
+  s.sensors[4].panel = Panel::P1Up;
+  s.sensors[5].panel = Panel::P1Up;
 
-  s.sensors[4].panel = Panel::P1Left;
-  s.sensors[5].panel = Panel::P1Left;
+  s.sensors[6].panel = Panel::P1Right;
+  s.sensors[7].panel = Panel::P1Right;
 
+  // To hard-code sensitivity set values here
+  // Defaults are set in common.h SensorState
+  s.sensors[4].triggerValue = 80;
+  s.sensors[5].triggerValue = 80;
+
+  // Configure mappings for light pins
+  // Output pins should be PWM - This firmware uses analogWrite for some nice effects
+  // Lighting constants, or swithcing to digitalWrite can be changed in light.h/cpp
+  // s.lights[Panel] = Light(output_pin)
+  s.lights[Panel::P1Right] = Light(12);
+  s.lights[Panel::P1Up] = Light(11);
+  s.lights[Panel::P1Down] = Light(10);
+  s.lights[Panel::P1Left] = Light(9);
+
+  pinMode(9, OUTPUT);
+  pinMode(10, OUTPUT);
+  pinMode(11, OUTPUT);
+  pinMode(12, OUTPUT);
+
+  // If you need to, set pinMode here
+  // I'm using the default mode of all these, so no need to change it
+  
   // Other state initialisation - Don't change this
   if( s.serial ) s.serial->initialise();
   for( auto& p : s.sensors ) s.panels[p.second.panel] = false;
@@ -144,8 +176,6 @@ void panelAlgorithm(State& s)
   Joystick.useManualSend(false);
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Main sketch functions - Binds basic sequence to the various program elements
 void readInputPins(State& s)
 {
   static bool firstTime = true;
@@ -160,12 +190,45 @@ void readInputPins(State& s)
   if( firstTime ) firstTime = false;
 }
 
+void lightUpdate(std::map<Panel, bool>& oldPanels, State& newState, float deltaSeconds)
+{
+  for( auto& panel : newState.panels )
+  {
+    auto light = newState.lights.find(panel.first);
+    if( light == newState.lights.end() )
+    {
+      continue;
+    }
+    
+    if( panel.second && !oldPanels[panel.first] )
+    {
+      // Panel pressed
+      light->second.target(0xff);
+      light->second.set(0xff);
+    }
+    else if( !panel.second && oldPanels[panel.first] )
+    {
+      // Panel released
+      light->second.target(0x00);
+      light->second.set(0x00);
+    }
+  }
+
+  for( auto& light : newState.lights )
+  {
+    light.second.tick(deltaSeconds);
+  }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 State gState;
+std::map<Panel, bool> gOldPanels;
 float secondsSinceStartup = 0.f;
 
 void setup(void) {
   initialiseState(gState);
+
+  for( auto& l : gState.lights ) l.second.target(0x00);
   // TODO
   // - eeprom initialisation
   // - eeprom save support
@@ -173,12 +236,7 @@ void setup(void) {
 }
 
 void loop(void) {
-  static bool setup = false;
-  if( !setup )
-  {
-    //initialiseState(gState);
-    setup = true;
-  }
+  gOldPanels = gState.panels;
 
   // Update timing data
   auto t = static_cast<float>(millis()) / 1000.f;
@@ -194,6 +252,9 @@ void loop(void) {
   // Combine the sensors, work out if panels are on/off, send joystick updates
   panelAlgorithm(gState);
 
+  // Light update
+  lightUpdate(gOldPanels, gState, dT);
+  
   // Serial update - Handle any commands from the cabinet
   static int i = 0;
   ++i;
@@ -201,4 +262,10 @@ void loop(void) {
     gState.serial->update(t, dT, gState);
     i = 0;
   }
+  
+#ifdef ENABLE_DEBUG
+  auto anyOn = false;
+  for(auto& p : gState.panels) if(p.second) anyOn = true;
+  digitalWrite(13, anyOn ? HIGH : LOW);
+#endif
 }

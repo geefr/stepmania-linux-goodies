@@ -4,6 +4,9 @@
 #include <map>
 #include <memory>
 #include <limits>
+#include <cstdint>
+#include <algorithm>
+#include "light.h"
 
 // The directions on the pad
 // Panel enum maps directly to joystick buttons
@@ -38,6 +41,7 @@ struct State
   std::unique_ptr<SerialProto> serial;
   std::map<int, SensorState> sensors; // <pin index, state>
   std::map<Panel, bool> panels; // Whether panels are on or off, output of PanelAlgorithm
+  std::map<Panel, Light> lights; // Bindings between input panels and lights
 };
 
 #endif
